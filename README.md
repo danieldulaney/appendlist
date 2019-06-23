@@ -1,5 +1,7 @@
 # AppendList: An append-only list data structure
 
+[![Build Status](https://travis-ci.com/danieldulaney/appendlist.svg?branch=master)](https://travis-ci.com/danieldulaney/appendlist)
+
 This list lets you add stuff to it, even if you're holding a reference to some
 of its elements.
 
