@@ -9,6 +9,7 @@ When should you use it?
 
 - You need to insert into a list while its other elements are borrowed
 - You have so much data that `Vec` reallocations are significant
+- Only a single line of unsafe code
 
 When shouldn't you use it?
 

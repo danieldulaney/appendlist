@@ -1,3 +1,12 @@
+//! An append-only list that preserves references to its elements
+//!
+//! Just about everything is in the `AppendList` struct.
+
+use std::ops::Index;
+
+// Must be a power of 2
+const FIRST_CHUNK_SIZE: usize = 16;
+
 /// A list that can be appended to while elements are borrowed
 ///
 /// This looks like a fairly bare-bones list API, except that it has a `push`
@@ -39,11 +48,6 @@
 /// located in chunk floor(log2(i + c) - log2(c)). If c is a power of 2, this
 /// is equivalent to floor(log2(i + c)) - floor(log2(c)), and a very fast floor
 /// log2 algorithm can be derived from `usize::leading_zeros()`.
-use std::ops::Index;
-
-// Must be a power of 2
-const FIRST_CHUNK_SIZE: usize = 16;
-
 pub struct AppendList<T> {
     chunks: Vec<Vec<T>>,
     len: usize,
@@ -58,6 +62,9 @@ impl<T> AppendList<T> {
         }
     }
 
+    /// Append an item to the end
+    ///
+    /// Note that this does not require `mut`.
     pub fn push(&self, item: T) {
         // Unsafe code alert!
         //
@@ -105,6 +112,7 @@ impl<T> AppendList<T> {
         self_mut.len += 1;
     }
 
+    /// Get the length of the list
     pub fn len(&self) -> usize {
         // Check that all chunks are correct (debug builds only)
         #[cfg(debug)]
@@ -137,6 +145,10 @@ impl<T> AppendList<T> {
         self.len
     }
 
+    /// Get an item from the list, if it is in bounds
+    ///
+    /// Returns `None` if the `index` is out-of-bounds. Note that you can also
+    /// index with `[]`, which will panic on out-of-bounds.
     pub fn get(&self, index: usize) -> Option<&T> {
         if index >= self.len {
             return None;
@@ -149,14 +161,22 @@ impl<T> AppendList<T> {
     }
 
     fn chunk_size(chunk_id: usize) -> usize {
+        // First chunk is FIRST_CHUNK_SIZE, subsequent chunks double each time
         FIRST_CHUNK_SIZE << chunk_id
     }
 
     fn chunk_start(chunk_id: usize) -> usize {
+        // This looks like magic, but I promise it works
+        // Essentially, each chunk is the size of the sum of all chunks before
+        // it. Except that the first chunk is different: it "should" be preceded
+        // by a whole list of chunks that sum to its size, but it's not. Therefore,
+        // there's a "missing" set of chunks the size of the first chunk, so
+        // later chunks need to be updated.
         AppendList::<()>::chunk_size(chunk_id) - FIRST_CHUNK_SIZE
     }
 
     fn index_chunk(index: usize) -> usize {
+        // This *is* magic
         Self::floor_log2(index + FIRST_CHUNK_SIZE) - Self::floor_log2(FIRST_CHUNK_SIZE)
     }
 
@@ -188,7 +208,7 @@ mod test {
         let mut index = 0;
 
         for chunk in 0..20 {
-            // Each chunk starts where the last one ends
+            // Each chunk starts just after the previous one ends
             assert_eq!(AppendList::<()>::chunk_start(chunk), index);
             index += AppendList::<()>::chunk_size(chunk);
         }
@@ -199,6 +219,7 @@ mod test {
         for index in 0..1_000_000 {
             let chunk_id = AppendList::<()>::index_chunk(index);
 
+            // Each index happens after its chunk start and before its chunk end
             assert!(index >= AppendList::<()>::chunk_start(chunk_id));
             assert!(
                 index
