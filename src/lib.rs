@@ -23,7 +23,7 @@
 /// located in chunk floor(log2(i + c) - log2(c)). If c is a power of 2, this
 /// is equivalent to floor(log2(i + c)) - floor(log2(c)), and a very fast floor
 /// log2 algorithm can be derived from `usize::leading_zeros()`.
-use std::ops::{Index};
+use std::ops::Index;
 
 // Must be a power of 2
 const FIRST_CHUNK_SIZE: usize = 16;
@@ -72,8 +72,7 @@ impl<T> AppendList<T> {
             // Check that the capacity didn't change (debug builds only)
             #[cfg(debug)]
             assert_eq!(prev_capacity, chunk.capacity());
-        }
-        else {
+        } else {
             // Need to allocate a new chunk
 
             // New chunk should be the immediate next chunk
@@ -109,12 +108,14 @@ impl<T> AppendList<T> {
                 }
 
                 // Last chunk is correct length
-                assert_eq!(self.chunks[self.chunks.len() - 1].len() - 1, self.len - Self::chunk_start(self.chunks.len() - 1));
+                assert_eq!(
+                    self.chunks[self.chunks.len() - 1].len() - 1,
+                    self.len - Self::chunk_start(self.chunks.len() - 1)
+                );
             } else {
                 // No chunks
                 assert_eq!(0, self.chunks.len());
             }
-
         }
 
         self.len
@@ -122,7 +123,7 @@ impl<T> AppendList<T> {
 
     pub fn get(&self, index: usize) -> Option<&T> {
         if index >= self.len {
-            return None
+            return None;
         }
 
         let chunk_id = Self::index_chunk(index);
@@ -155,7 +156,8 @@ impl<T> Index<usize> for AppendList<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.get(index).expect("AppendList indexed beyond its length")
+        self.get(index)
+            .expect("AppendList indexed beyond its length")
     }
 }
 
@@ -182,7 +184,11 @@ mod test {
             let chunk_id = AppendList::<()>::index_chunk(index);
 
             assert!(index >= AppendList::<()>::chunk_start(chunk_id));
-            assert!(index < AppendList::<()>::chunk_start(chunk_id) + AppendList::<()>::chunk_size(chunk_id));
+            assert!(
+                index
+                    < AppendList::<()>::chunk_start(chunk_id)
+                        + AppendList::<()>::chunk_size(chunk_id)
+            );
         }
     }
 
@@ -222,4 +228,3 @@ mod test {
         }
     }
 }
-
