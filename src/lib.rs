@@ -6,13 +6,29 @@
 ///
 /// Additionally, the list has O(1) index and O(1) push (not amortized!).
 ///
+/// For example, this would be illegal with a `Vec`:
+///
+/// ```
+/// use appendlist::AppendList;
+///
+/// let list = AppendList::new();
+///
+/// list.push(1);
+/// let first_item = &list[0];
+/// list.push(2);
+/// let second_item = &list[1];
+///
+/// assert_eq!(*first_item, list[0]);
+/// assert_eq!(*second_item, list[1]);
+/// ```
+///
 /// # Implementation details
 ///
 /// This section is not necessary to use the API, it just describes the underlying
 /// allocation and indexing strategies.
 ///
 /// The list is a `Vec` of *chunks*. Each chunk is itself a `Vec<T>`. The list
-/// will fill up a chunk, then allocate a new chunk with the full capacity.
+/// will fill up a chunk, then allocate a new chunk with its full capacity.
 /// Because the capacity of a given chunk never changes, the underlying `Vec<T>`
 /// never reallocates, so references to that chunk are never invalidated. Each
 /// chunk is twice the size of the previous chunk, so there will never be more
