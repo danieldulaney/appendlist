@@ -3,5 +3,8 @@ name = "appendlist"
 version = "0.1.0"
 authors = ["Daniel Dulaney <dan@dulaney.xyz>"]
 edition = "2018"
+license = "MIT"
+description = "An append-only list that preserves references to its elements"
+repository = "https://github.com/danieldulaney/appendlist"
 
 [dependencies]
