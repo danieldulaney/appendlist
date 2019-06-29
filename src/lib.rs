@@ -75,7 +75,7 @@ impl<T> AppendList<T> {
         let self_mut: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
 
         let new_index = self.len;
-        let chunk_id = Self::index_chunk(new_index);
+        let chunk_id = index_chunk(new_index);
 
         if chunk_id < self.chunks.len() {
             // We should always be inserting into the last chunk
@@ -101,8 +101,8 @@ impl<T> AppendList<T> {
             // New chunk should be the immediate next chunk
             debug_assert_eq!(chunk_id, self.chunks.len());
 
-            let mut new_chunk = Vec::with_capacity(Self::chunk_size(chunk_id));
-            debug_assert!(new_chunk.capacity() >= Self::chunk_size(chunk_id));
+            let mut new_chunk = Vec::with_capacity(chunk_size(chunk_id));
+            debug_assert!(new_chunk.capacity() >= chunk_size(chunk_id));
 
             new_chunk.push(item);
 
@@ -154,38 +154,38 @@ impl<T> AppendList<T> {
             return None;
         }
 
-        let chunk_id = Self::index_chunk(index);
-        let chunk_start = Self::chunk_start(chunk_id);
+        let chunk_id = index_chunk(index);
+        let chunk_start = chunk_start(chunk_id);
 
         return Some(&self.chunks[chunk_id][index - chunk_start]);
     }
+}
 
-    fn chunk_size(chunk_id: usize) -> usize {
-        // First chunk is FIRST_CHUNK_SIZE, subsequent chunks double each time
-        FIRST_CHUNK_SIZE << chunk_id
-    }
+const fn chunk_size(chunk_id: usize) -> usize {
+    // First chunk is FIRST_CHUNK_SIZE, subsequent chunks double each time
+    FIRST_CHUNK_SIZE << chunk_id
+}
 
-    fn chunk_start(chunk_id: usize) -> usize {
-        // This looks like magic, but I promise it works
-        // Essentially, each chunk is the size of the sum of all chunks before
-        // it. Except that the first chunk is different: it "should" be preceded
-        // by a whole list of chunks that sum to its size, but it's not. Therefore,
-        // there's a "missing" set of chunks the size of the first chunk, so
-        // later chunks need to be updated.
-        AppendList::<()>::chunk_size(chunk_id) - FIRST_CHUNK_SIZE
-    }
+const fn chunk_start(chunk_id: usize) -> usize {
+    // This looks like magic, but I promise it works
+    // Essentially, each chunk is the size of the sum of all chunks before
+    // it. Except that the first chunk is different: it "should" be preceded
+    // by a whole list of chunks that sum to its size, but it's not. Therefore,
+    // there's a "missing" set of chunks the size of the first chunk, so
+    // later chunks need to be updated.
+    chunk_size(chunk_id) - FIRST_CHUNK_SIZE
+}
 
-    fn index_chunk(index: usize) -> usize {
-        // This *is* magic
-        Self::floor_log2(index + FIRST_CHUNK_SIZE) - Self::floor_log2(FIRST_CHUNK_SIZE)
-    }
+const fn index_chunk(index: usize) -> usize {
+    // This *is* magic
+    floor_log2(index + FIRST_CHUNK_SIZE) - floor_log2(FIRST_CHUNK_SIZE)
+}
 
-    #[inline]
-    const fn floor_log2(x: usize) -> usize {
-        const BITS_PER_BYTE: usize = 8;
+#[inline]
+const fn floor_log2(x: usize) -> usize {
+    const BITS_PER_BYTE: usize = 8;
 
-        BITS_PER_BYTE * std::mem::size_of::<usize>() - (x.leading_zeros() as usize) - 1
-    }
+    BITS_PER_BYTE * std::mem::size_of::<usize>() - (x.leading_zeros() as usize) - 1
 }
 
 impl<T> Index<usize> for AppendList<T> {
@@ -199,32 +199,42 @@ impl<T> Index<usize> for AppendList<T> {
 
 #[cfg(test)]
 mod test {
-    use super::{AppendList, FIRST_CHUNK_SIZE};
+    use super::*;
+
+    fn log2(x: usize) -> f64 {
+        (x as f64).log2()
+    }
+
+    #[test]
+    fn first_chunk_size_is_power_of_2() {
+        assert_eq!(floor_log2(FIRST_CHUNK_SIZE) as f64, log2(FIRST_CHUNK_SIZE));
+    }
 
     #[test]
     fn chunk_sizes_make_sense() {
-        assert_eq!(AppendList::<()>::chunk_size(0), FIRST_CHUNK_SIZE);
+        assert_eq!(chunk_size(0), FIRST_CHUNK_SIZE);
 
         let mut index = 0;
 
         for chunk in 0..20 {
             // Each chunk starts just after the previous one ends
-            assert_eq!(AppendList::<()>::chunk_start(chunk), index);
-            index += AppendList::<()>::chunk_size(chunk);
+            assert_eq!(chunk_start(chunk), index);
+            index += chunk_size(chunk);
+
         }
     }
 
     #[test]
     fn index_chunk_matches_up() {
         for index in 0..1_000_000 {
-            let chunk_id = AppendList::<()>::index_chunk(index);
+            let chunk_id = index_chunk(index);
 
             // Each index happens after its chunk start and before its chunk end
-            assert!(index >= AppendList::<()>::chunk_start(chunk_id));
+            assert!(index >= chunk_start(chunk_id));
             assert!(
                 index
-                    < AppendList::<()>::chunk_start(chunk_id)
-                        + AppendList::<()>::chunk_size(chunk_id)
+                    < chunk_start(chunk_id)
+                        + chunk_size(chunk_id)
             );
         }
     }
