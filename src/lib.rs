@@ -160,6 +160,14 @@ impl<T> AppendList<T> {
 
         return Some(&self.chunks[chunk_id][index - chunk_start]);
     }
+
+    /// Get an iterator over the list
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        AppendListIter {
+            list: &self,
+            index: 0,
+        }
+    }
 }
 
 const fn chunk_size(chunk_id: usize) -> usize {
@@ -210,6 +218,29 @@ impl<T> FromIterator<T> for AppendList<T> {
     }
 }
 
+pub struct AppendListIter<'l, T> {
+    list: &'l AppendList<T>,
+    index: usize,
+}
+
+impl<'l, T> Iterator for AppendListIter<'l, T> {
+    type Item = &'l T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.list.get(self.index);
+
+        self.index += 1;
+
+        item
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.list.len() - self.index;
+
+        (remaining, Some(remaining))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -225,6 +256,43 @@ mod test {
         for i in 0..100 {
             assert_eq!(l[i], i as i32);
         }
+    }
+
+    #[test]
+    fn iterator() {
+        let l: AppendList<i32> = (0..100).collect();
+        let mut i = l.iter();
+
+        for item in 0..100 {
+            assert_eq!(i.next(), Some(&item));
+        }
+
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn iterator_size_hint() {
+        let l: AppendList<i32> = AppendList::new();
+        let mut i = l.iter();
+        assert_eq!(i.size_hint(), (0, Some(0)));
+
+        l.push(1);
+        assert_eq!(i.size_hint(), (1, Some(1)));
+
+        l.push(2);
+        assert_eq!(i.size_hint(), (2, Some(2)));
+
+        i.next();
+        assert_eq!(i.size_hint(), (1, Some(1)));
+
+        l.push(3);
+        assert_eq!(i.size_hint(), (2, Some(2)));
+
+        i.next();
+        assert_eq!(i.size_hint(), (1, Some(1)));
+
+        i.next();
+        assert_eq!(i.size_hint(), (0, Some(0)));
     }
 
     #[test]
