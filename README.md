@@ -24,6 +24,28 @@ What are some features?
 - You can hold onto references in the list
 - Only a single line of unsafe code
 
+## What does this let me do?
+
+```rust
+let list: Vec<u32> = (1..=10).collect();
+
+let second_element = &list[1];
+
+list.push(11); // Push needs &mut self, but list is already borrowed
+
+dbg!(second_element); // Fails to compile
+```
+
+```rust
+let list: AppendList<u32> = (1..=10).collect();
+
+let second_element = &list[1];
+
+list.push(11); // Push only needs &self, so this works fine
+
+dbg!(second_element); // Prints 2
+```
+
 ## What's all this about reallocations?
 
 In general, `Vec`s are pretty cool, and you should use them by default. But they
@@ -72,4 +94,4 @@ However, it also comes with some drawbacks:
 Probably not.
 
 In general, you should just use a `Vec` and keep track of indices rather than
-references. But if keeping references are very important, then this is your solution.
+references. But if keeping references is very important, then this is your solution.
