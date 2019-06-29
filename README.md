@@ -26,24 +26,31 @@ What are some features?
 
 ## What does this let me do?
 
-```rust
+This example fails to compile because `second_element` has a reference into
+`list` when `list.push()` is called.
+
+```rust compile_fail
 let list: Vec<u32> = (1..=10).collect();
 
 let second_element = &list[1];
 
 list.push(11); // Push needs &mut self, but list is already borrowed
 
-dbg!(second_element); // Fails to compile
+assert_eq!(*second_element, 2); // Fails to compile
 ```
 
+But if you just swap in `AppendList` for `Vec`, everything works!
+
 ```rust
+use appendlist::AppendList;
+
 let list: AppendList<u32> = (1..=10).collect();
 
 let second_element = &list[1];
 
 list.push(11); // Push only needs &self, so this works fine
 
-dbg!(second_element); // Prints 2
+assert_eq!(*second_element, 2); // All OK!
 ```
 
 ## What's all this about reallocations?
