@@ -2,6 +2,7 @@
 //!
 //! Just about everything is in the `AppendList` struct.
 
+use std::iter::FromIterator;
 use std::ops::Index;
 
 // Must be a power of 2
@@ -197,12 +198,33 @@ impl<T> Index<usize> for AppendList<T> {
     }
 }
 
+impl<T> FromIterator<T> for AppendList<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let list = Self::new();
+
+        for item in iter {
+            list.push(item);
+        }
+
+        list
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     fn log2(x: usize) -> f64 {
         (x as f64).log2()
+    }
+
+    #[test]
+    fn from_iterator() {
+        let l: AppendList<i32> = (0..100).collect();
+
+        for i in 0..100 {
+            assert_eq!(l[i], i as i32);
+        }
     }
 
     #[test]
@@ -220,7 +242,6 @@ mod test {
             // Each chunk starts just after the previous one ends
             assert_eq!(chunk_start(chunk), index);
             index += chunk_size(chunk);
-
         }
     }
 
@@ -231,11 +252,7 @@ mod test {
 
             // Each index happens after its chunk start and before its chunk end
             assert!(index >= chunk_start(chunk_id));
-            assert!(
-                index
-                    < chunk_start(chunk_id)
-                        + chunk_size(chunk_id)
-            );
+            assert!(index < chunk_start(chunk_id) + chunk_size(chunk_id));
         }
     }
 
