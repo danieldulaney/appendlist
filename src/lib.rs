@@ -218,7 +218,7 @@ impl<T> FromIterator<T> for AppendList<T> {
     }
 }
 
-pub struct AppendListIter<'l, T> {
+struct AppendListIter<'l, T> {
     list: &'l AppendList<T>,
     index: usize,
 }
