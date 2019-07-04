@@ -296,6 +296,12 @@ const fn floor_log2(x: usize) -> usize {
     BITS_PER_BYTE * std::mem::size_of::<usize>() - (x.leading_zeros() as usize) - 1
 }
 
+impl<T> Default for AppendList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Index<usize> for AppendList<T> {
     type Output = T;
 
@@ -425,10 +431,15 @@ mod test {
 
     #[test]
     fn empty_list() {
-        let l: AppendList<usize> = AppendList::new();
+        let n: AppendList<usize> = AppendList::new();
 
-        assert_eq!(l.len(), 0);
-        assert_eq!(l.get(0), None);
+        assert_eq!(n.len(), 0);
+        assert_eq!(n.get(0), None);
+
+        let d: AppendList<usize> = AppendList::default();
+
+        assert_eq!(d.len(), 0);
+        assert_eq!(d.get(0), None);
     }
 
     #[test]
