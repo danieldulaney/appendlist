@@ -1,9 +1,11 @@
 [package]
 name = "appendlist"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["Daniel Dulaney <dan@dulaney.xyz>"]
 edition = "2018"
 license = "MIT"
+description = "An append-only list that preserves references to its elements"
+readme = "README.md"
 repository = "https://github.com/danieldulaney/appendlist"
 
 [dependencies]
