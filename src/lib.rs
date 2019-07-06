@@ -102,6 +102,7 @@
 //! references. But if keeping references is very important, then this is your solution.
 
 use std::cell::{Cell, UnsafeCell};
+use std::fmt::{self, Debug};
 use std::iter::FromIterator;
 use std::ops::Index;
 
@@ -344,6 +345,12 @@ impl<T> FromIterator<T> for AppendList<T> {
         }
 
         list
+    }
+}
+
+impl<T: Debug> Debug for AppendList<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_list().entries(self.iter()).finish()
     }
 }
 
