@@ -103,6 +103,7 @@
 
 use std::iter::FromIterator;
 use std::ops::Index;
+use std::cell::{Cell, UnsafeCell};
 
 // Must be a power of 2
 const FIRST_CHUNK_SIZE: usize = 16;
@@ -149,16 +150,54 @@ const FIRST_CHUNK_SIZE: usize = 16;
 /// is equivalent to floor(log2(i + c)) - floor(log2(c)), and a very fast floor
 /// log2 algorithm can be derived from `usize::leading_zeros()`.
 pub struct AppendList<T> {
-    chunks: Vec<Vec<T>>,
-    len: usize,
+    chunks: UnsafeCell<Vec<Vec<T>>>,
+    len: Cell<usize>,
 }
 
 impl<T> AppendList<T> {
+
+    /// Wrapper to get the list of chunks immutably
+    fn chunks(&self) -> &[Vec<T>] {
+        unsafe { &*self.chunks.get() }
+    }
+
+    /// In test builds, check all of the unsafe invariants
+    ///
+    /// In release builds, no-op
+    fn check_invariants(&self) {
+        #[cfg(test)]
+        {
+            if self.len.get() > 0 {
+                // Correct number of chunks
+                assert_eq!(index_chunk(self.len.get() - 1), self.chunks().len() - 1);
+
+                // Every chunk holds enough items
+                for chunk_id in 0..self.chunks().len() {
+                    assert!(chunk_size(chunk_id) <= self.chunks()[chunk_id].capacity());
+                }
+
+                // Intermediate chunks are full
+                for chunk_id in 0..self.chunks().len() - 1 {
+                    assert_eq!(chunk_size(chunk_id), self.chunks()[chunk_id].len());
+                }
+
+                // Last chunk is correct length
+                assert_eq!(
+                    self.chunks().last().unwrap().len(),
+                    self.len.get() - chunk_start(self.chunks().len() - 1)
+                );
+            } else {
+                // No chunks
+                assert_eq!(0, self.chunks().len());
+            }
+        }
+    }
+
     /// Create a new `AppendList`
     pub fn new() -> Self {
         Self {
-            chunks: Vec::new(),
-            len: 0,
+            chunks: UnsafeCell::new(Vec::new()),
+            len: Cell::new(0),
         }
     }
 
@@ -166,83 +205,66 @@ impl<T> AppendList<T> {
     ///
     /// Note that this does not require `mut`.
     pub fn push(&self, item: T) {
+
+        self.check_invariants();
+
         // Unsafe code alert!
         //
         // Preserve the following invariants:
         // - Only the last chunk may be modified
         // - A chunk cannot ever be reallocated
         // - len must reflect the length
-        let self_mut: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
+        //
+        // Invariants are checked in the check_invariants method
+        let mut_chunks = unsafe { &mut *self.chunks.get() };
 
-        let new_index = self.len;
+        let new_index = self.len.get();
         let chunk_id = index_chunk(new_index);
 
-        if chunk_id < self.chunks.len() {
+        if chunk_id < mut_chunks.len() {
             // We should always be inserting into the last chunk
-            debug_assert_eq!(chunk_id, self.chunks.len() - 1);
+            debug_assert_eq!(chunk_id, mut_chunks.len() - 1);
 
             // Insert into the appropriate chunk
-            let chunk = &mut self_mut.chunks[chunk_id];
+            let chunk = &mut mut_chunks[chunk_id];
 
             // The chunk must not be reallocated! Save the pre-insertion capacity
             // so we can check it later (debug builds only)
-            #[cfg(debug)]
+            #[cfg(test)]
             let prev_capacity = chunk.capacity();
 
             // Do the insertion
             chunk.push(item);
 
             // Check that the capacity didn't change (debug builds only)
-            #[cfg(debug)]
+            #[cfg(test)]
             assert_eq!(prev_capacity, chunk.capacity());
         } else {
             // Need to allocate a new chunk
 
             // New chunk should be the immediate next chunk
-            debug_assert_eq!(chunk_id, self.chunks.len());
+            debug_assert_eq!(chunk_id, mut_chunks.len());
 
+            // New chunk must be big enough
             let mut new_chunk = Vec::with_capacity(chunk_size(chunk_id));
             debug_assert!(new_chunk.capacity() >= chunk_size(chunk_id));
 
             new_chunk.push(item);
 
-            self_mut.chunks.push(new_chunk);
+            mut_chunks.push(new_chunk);
         }
 
-        self_mut.len += 1;
+        // Increment the length
+        self.len.set(self.len.get() + 1);
+
+        self.check_invariants();
     }
 
     /// Get the length of the list
     pub fn len(&self) -> usize {
-        // Check that all chunks are correct (debug builds only)
-        #[cfg(debug)]
-        {
-            if self.len > 0 {
-                // Correct number of chunks
-                assert_eq!(Self::index_chunk(self.len - 1), self.chunks.len() - 1);
+        self.check_invariants();
 
-                // Every chunk holds enough items
-                for chunk_id in 0..self.chunks.len() {
-                    assert!(Self::chunk_size(chunk_id) <= self.chunks[chunk_id].capacity());
-                }
-
-                // Intermediate chunks are full
-                for chunk_id in 0..self.chunks.len() - 1 {
-                    assert_eq!(Self::chunk_size(chunk_id), self.chunks[chunk_id].len());
-                }
-
-                // Last chunk is correct length
-                assert_eq!(
-                    self.chunks[self.chunks.len() - 1].len() - 1,
-                    self.len - Self::chunk_start(self.chunks.len() - 1)
-                );
-            } else {
-                // No chunks
-                assert_eq!(0, self.chunks.len());
-            }
-        }
-
-        self.len
+        self.len.get()
     }
 
     /// Get an item from the list, if it is in bounds
@@ -250,18 +272,22 @@ impl<T> AppendList<T> {
     /// Returns `None` if the `index` is out-of-bounds. Note that you can also
     /// index with `[]`, which will panic on out-of-bounds.
     pub fn get(&self, index: usize) -> Option<&T> {
-        if index >= self.len {
+        self.check_invariants();
+
+        if index >= self.len() {
             return None;
         }
 
         let chunk_id = index_chunk(index);
         let chunk_start = chunk_start(chunk_id);
 
-        return Some(&self.chunks[chunk_id][index - chunk_start]);
+        return Some(&self.chunks()[chunk_id][index - chunk_start]);
     }
 
     /// Get an iterator over the list
     pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.check_invariants();
+
         AppendListIter {
             list: &self,
             index: 0,
