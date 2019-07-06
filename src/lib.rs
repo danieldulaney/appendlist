@@ -284,10 +284,10 @@ impl<T> AppendList<T> {
     }
 
     /// Get an iterator over the list
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> Iter<T> {
         self.check_invariants();
 
-        AppendListIter {
+        Iter {
             list: &self,
             index: 0,
         }
@@ -348,18 +348,27 @@ impl<T> FromIterator<T> for AppendList<T> {
     }
 }
 
+impl<'l, T> IntoIterator for &'l AppendList<T> {
+    type Item = &'l T;
+    type IntoIter = Iter<'l, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<T: Debug> Debug for AppendList<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_list().entries(self.iter()).finish()
     }
 }
 
-struct AppendListIter<'l, T> {
+pub struct Iter<'l, T> {
     list: &'l AppendList<T>,
     index: usize,
 }
 
-impl<'l, T> Iterator for AppendListIter<'l, T> {
+impl<'l, T> Iterator for Iter<'l, T> {
     type Item = &'l T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -397,13 +406,16 @@ mod test {
     #[test]
     fn iterator() {
         let l: AppendList<i32> = (0..100).collect();
-        let mut i = l.iter();
+        let mut i1 = l.iter();
+        let mut i2 = l.into_iter();
 
         for item in 0..100 {
-            assert_eq!(i.next(), Some(&item));
+            assert_eq!(i1.next(), Some(&item));
+            assert_eq!(i2.next(), Some(&item));
         }
 
-        assert_eq!(i.next(), None);
+        assert_eq!(i1.next(), None);
+        assert_eq!(i2.next(), None);
     }
 
     #[test]
@@ -479,6 +491,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn million_item_list() {
         test_big_list(1_000_000);
     }
