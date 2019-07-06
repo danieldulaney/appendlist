@@ -357,6 +357,21 @@ impl<'l, T> IntoIterator for &'l AppendList<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for AppendList<T> {
+    fn eq(&self, other: &AppendList<T>) -> bool {
+        let mut s = self.iter();
+        let mut o = other.iter();
+
+        loop {
+            match (s.next(), o.next()) {
+                (Some(a), Some(b)) if a == b => {},
+                (None, None) => return true,
+                _ => return false,
+            }
+        }
+    }
+}
+
 impl<T: Debug> Debug for AppendList<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_list().entries(self.iter()).finish()
@@ -390,10 +405,6 @@ impl<'l, T> Iterator for Iter<'l, T> {
 mod test {
     use super::*;
 
-    fn log2(x: usize) -> f64 {
-        (x as f64).log2()
-    }
-
     #[test]
     fn from_iterator() {
         let l: AppendList<i32> = (0..100).collect();
@@ -419,6 +430,27 @@ mod test {
     }
 
     #[test]
+    fn equality() {
+        let a = AppendList::new();
+        let b = AppendList::new();
+
+        assert_eq!(a, b);
+
+        a.push("foo");
+
+        assert_ne!(a, b);
+
+        b.push("foo");
+
+        assert_eq!(a, b);
+
+        a.push("bar");
+        a.push("baz");
+
+        assert_ne!(a, b);
+    }
+
+    #[test]
     fn iterator_size_hint() {
         let l: AppendList<i32> = AppendList::new();
         let mut i = l.iter();
@@ -441,11 +473,6 @@ mod test {
 
         i.next();
         assert_eq!(i.size_hint(), (0, Some(0)));
-    }
-
-    #[test]
-    fn first_chunk_size_is_power_of_2() {
-        assert_eq!(floor_log2(FIRST_CHUNK_SIZE) as f64, log2(FIRST_CHUNK_SIZE));
     }
 
     #[test]
