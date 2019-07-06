@@ -1,7 +1,9 @@
+//! # AppendList: An append-only list that preserves references to its elements
+//!
 //! [![Build Status](https://travis-ci.com/danieldulaney/appendlist.svg?branch=master)](https://travis-ci.com/danieldulaney/appendlist)
 //!
 //! This list lets you add new things to the end, even if you're holding a reference
-//! to something already inside it.
+//! to something already inside it. It also avoids reallocations.
 //!
 //! When should you use it?
 //!
@@ -20,7 +22,7 @@
 //! - Non-amortized constant-time insertions and indexes (normally insertions are
 //!   *amortized* constant-time, like `Vec`, or indexing is linear-time, like `LinkedList`)
 //! - You can hold onto references in the list
-//! - Only a single line of unsafe code
+//! - Only 2 lines of unsafe code
 //!
 //! ## What does this let me do?
 //!
