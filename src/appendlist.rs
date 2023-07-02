@@ -100,7 +100,7 @@ impl<T> AppendList<T> {
     /// Append an item to the end
     ///
     /// Note that this does not require `mut`.
-    pub fn push(&self, item: T) {
+    pub fn push(&self, item: T) -> &T {
         self.check_invariants();
 
         // Unsafe code alert!
@@ -116,7 +116,7 @@ impl<T> AppendList<T> {
         let new_index = self.len.get();
         let chunk_id = index_chunk(new_index);
 
-        if chunk_id < mut_chunks.len() {
+        let item_ptr = if chunk_id < mut_chunks.len() {
             // We should always be inserting into the last chunk
             debug_assert_eq!(chunk_id, mut_chunks.len() - 1);
 
@@ -134,6 +134,8 @@ impl<T> AppendList<T> {
             // Check that the capacity didn't change (debug builds only)
             #[cfg(test)]
             assert_eq!(prev_capacity, chunk.capacity());
+
+            chunk.last().unwrap()
         } else {
             // Need to allocate a new chunk
 
@@ -146,13 +148,19 @@ impl<T> AppendList<T> {
 
             new_chunk.push(item);
 
+            let item_ptr = new_chunk.last().unwrap() as *const T;
+
             mut_chunks.push(new_chunk);
-        }
+
+            item_ptr
+        };
 
         // Increment the length
         self.len.set(self.len.get() + 1);
 
         self.check_invariants();
+
+        unsafe { &*item_ptr }
     }
 
     /// Get the length of the list
@@ -233,7 +241,7 @@ impl<T: PartialEq> PartialEq for AppendList<T> {
 
         loop {
             match (s.next(), o.next()) {
-                (Some(a), Some(b)) if a == b => {},
+                (Some(a), Some(b)) if a == b => {}
                 (None, None) => return true,
                 _ => return false,
             }
@@ -305,18 +313,22 @@ mod test {
 
         assert_eq!(a, b);
 
-        a.push("foo");
+        let foo1 = a.push("foo");
 
         assert_ne!(a, b);
 
-        b.push("foo");
+        let foo2 = b.push("foo");
 
         assert_eq!(a, b);
 
-        a.push("bar");
-        a.push("baz");
+        let bar = a.push("bar");
+        let baz = a.push("baz");
 
         assert_ne!(a, b);
+
+        assert_eq!(*foo1, *foo2);
+        assert_eq!(*bar, "bar");
+        assert_eq!(*baz, "baz");
     }
 
     #[test]
@@ -325,16 +337,16 @@ mod test {
         let mut i = l.iter();
         assert_eq!(i.size_hint(), (0, Some(0)));
 
-        l.push(1);
+        let a = l.push(1);
         assert_eq!(i.size_hint(), (1, Some(1)));
 
-        l.push(2);
+        let b = l.push(2);
         assert_eq!(i.size_hint(), (2, Some(2)));
 
         i.next();
         assert_eq!(i.size_hint(), (1, Some(1)));
 
-        l.push(3);
+        let c = l.push(3);
         assert_eq!(i.size_hint(), (2, Some(2)));
 
         i.next();
@@ -342,6 +354,10 @@ mod test {
 
         i.next();
         assert_eq!(i.size_hint(), (0, Some(0)));
+
+        assert_eq!(*a, 1);
+        assert_eq!(*b, 2);
+        assert_eq!(*c, 3);
     }
 
     #[test]
@@ -371,18 +387,21 @@ mod test {
     fn test_big_list(size: usize) {
         let l = AppendList::new();
         let mut refs = Vec::new();
+        let mut refs_1 = Vec::new();
 
         for i in 0..size {
             assert_eq!(l.len(), i);
 
-            l.push(i);
+            let r = l.push(i);
             refs.push(l[i]);
+            refs_1.push(r);
 
             assert_eq!(l.len(), i + 1);
         }
 
         for i in 0..size {
             assert_eq!(Some(&refs[i]), l.get(i));
+            assert_eq!(refs[i], *refs_1[i]);
         }
     }
 }
